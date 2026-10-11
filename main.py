@@ -16,18 +16,20 @@ from sequential import SequentialGame
 #from parallel import ParallelGame
 from gui import GameVisualizer
 import random
+from parallel import ParallelGame   # descomentar
 
 if __name__ == "__main__":
-    MODE = "sequential"  # Opciones: "sequential" or "parallel"
-    
-    board = Board(rows=50, cols=50)
-    # Random board
-    for row in range(board.rows):
-        for col in range(board.cols):
-            board.grid[row][col] = random.randint(0, 1) # Valor aleatorio de celda
+
+    MODE = "parallel"
+    NUM_WORKERS = 4
 
     if MODE == "sequential":
-        engine = SequentialGame(board)
+        engine = SequentialGame(Board)
+    elif MODE == "parallel":
+        engine = ParallelGame(Board, num_workers=NUM_WORKERS)
+    else:
+        raise ValueError(f"Modo inválido: {MODE}")
 
     app = GameVisualizer(engine)
     app.run()
+    engine.close() if MODE == "parallel" else None
