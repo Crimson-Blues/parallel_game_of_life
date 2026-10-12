@@ -56,20 +56,16 @@ EJEMPLO DE SALIDA
     [[4 5 4 2], [3 4 4 1]]
 ]"""
 def readed_grid(grid, chunking):
-    num_workers = len(chunking)
-    results = Manager().list([None] * num_workers)
-    processes = []
+    with Manager() as manager:
+        results = manager.list([None] * len(chunking))
+        processes = [Process(target=readed_chunks, args=(grid, band, results, i))
+                     for i, band in enumerate(chunking)]
 
-    for idx in range(num_workers):
-        p = Process(target=readed_chunks, args=(grid, chunking[idx], results, idx))
-        processes.append(p)
-
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join()
-
-    return results
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join()
+        return list(results) 
 
 
 # LEER POR BLOQUE
@@ -105,22 +101,52 @@ def readed_chunks(grid, target_rows, results, index):
     results[index] = readed_block
 
 
+#LECTOR DE LOS BLOQUES RESULTANTES DE readed_chunks
+#ENTRADAS: recibe el tablero para saber cuales son las celular vivas, e lchunking y el resultado de haber leido los chunks
+#SALIDA: los bloques con las nuevas celulas 
+def read_blocks(grid, chunking, readed_bock):
+    with Manager() as manager:
+        results = manager.list([None] * len(readed_bock))
+        processes = [Process(target=write_blocks, args=(grid[r0:r1], readed_bock[i], results, i))
+                    for i, (r0, r1) in enumerate(chunking)]
+        
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join()
+        return list(results)
 
-# ESCRITOR
-# ENTRADA: matriz, fila comiendo, fila final (sin tomarla)
-# SALIDA: el pedazo de matriz "resuelto"
-def compute_band(grid, r0, r1):
-    num_cols = len(grid[0])
-    result = []
 
-    for r in range(r0, r1):
-        new_row = []
-        for c in range(num_cols):
-            neighbors = count_neighbors(grid, r, c)
-            new_row.append(next_state(grid[r][c], neighbors))
-        result.append(new_row)
+def write_blocks(grid, block, results, index):
+    cells = []
 
-    return result
+    for r in range(len(block)):
+        new_row =[]
+        for c in range(len(block[0])):
+            if grid[r][c] == 1:
+                if block[r][c] < 2:
+                    new_cell = 0 # Muerte por soledad
+                elif 2 <= block[r][c] <= 3:
+                    new_cell = 1 # Mantiene viva
+                else:
+                    new_cell = 0 # Muerte por sobrepoblación
+
+            else: # Para célula muerta
+                if block[r][c] == 3:
+                    new_cell = 1 # Revive si tiene 3 vecinos
+                else:
+                    new_cell = 0 # Mantiene muerta
+
+            new_row.append(new_cell)
+        cells.append(new_row)
+    results[index] = cells
+
+def normalizer(blocks):
+    board_rows = []
+    for block in blocks:
+        board_rows += block
+
+    return board_rows   
 
 
 # HACER EL CHUNKING
@@ -144,10 +170,11 @@ class ParallelGame:
         self.board = board
         self.num_workers = num_workers
 
-
     def step(self):
-        # matriz de la generación siguiente
-        new_grid = [[0 for _ in range(4)] for _ in range(4)]
-        chunking = create_bands(4, self.num_workers)
-        readed_b = readed_grid(self.board, chunking)
-        print(readed_b)
+        grid = self.board.grid
+        chunking = create_bands(self.board.rows, self.num_workers)
+        counts = readed_grid(grid, chunking)
+        new_blocks = read_blocks(grid, chunking, counts)
+        new_grid = normalizer(new_blocks)
+        self.board.set_grid(new_grid)
+

@@ -43,6 +43,7 @@ class SequentialGame:
     def step(self):
         new_grid = [[0 for _ in range(self.board.cols)] for _ in range(self.board.rows)]
         # Chequeo secuencial de todas las celdas con ciclos for clásicos
+        
         for r in range(self.board.rows):
             for c in range(self.board.cols):
                 neighbors = self.board.count_neighbors(r, c)
