@@ -14,6 +14,7 @@ Código: 750023C
 from models import Board
 from sequential import SequentialGame
 from parallel import ParallelGame
+from parallel_pool import ParallelPoolGame
 from gui import GameVisualizer
 import random
 import copy
@@ -21,7 +22,7 @@ import copy
 if __name__ == "__main__":
     NUM_WORKERS = 10
     
-    board = Board(rows=20 , cols=20)
+    board = Board(rows=50 , cols=50)
     # Random board
     for row in range(board.rows):
         for col in range(board.cols):
