@@ -1,3 +1,12 @@
+"""
+Nombre: GUI
+Autores:
+- Juan Diego Cárdenas Mejía - 2416437
+- Samuel Banguero Ortega - 2418671
+- Santiago Arias Rojas - 2416285
+Fecha de Creación: 2026-10-10
+Descripción: Interfaz Gráfica de Usuario para la visualización de iteracciones del juego
+"""
 import pygame
 import sys
 import time

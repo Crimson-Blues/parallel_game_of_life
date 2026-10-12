@@ -3,7 +3,7 @@ Nombre: Motor secuencial de juego de la vida
 Autores:
 - Juan Diego Cárdenas Mejía - 2416437
 - Samuel Banguero Ortega - 2418671
-- Santiago Arias 
+- Santiago Arias Rojas - 2416285
 Fecha de Creación: 2026-10-10
 Descripción: Cálculo secuencial de actualización de siguiente generación de juego, para un tablero dado. 
 
