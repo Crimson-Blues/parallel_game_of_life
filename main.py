@@ -19,21 +19,16 @@ import random
 import copy
 
 if __name__ == "__main__":
-    MODE = "sequential"  # Opciones: "sequential" or "parallel"}
-    NUM_WORKERS = 2
+    NUM_WORKERS = 10
     
-    board = Board(rows=50, cols=50)
+    board = Board(rows=70 , cols=70)
     # Random board
     for row in range(board.rows):
         for col in range(board.cols):
             board.grid[row][col] = random.randint(0, 1) # Valor aleatorio de celda
 
-    if MODE == "sequential":
-        engine_a = SequentialGame(board)
-        engine_b = SequentialGame(copy.deepcopy(board))
-
-    if MODE == "parallel":
-        engine = ParallelGame([[1, 1, 0, 0], [0, 1, 0, 0], [1, 1, 1, 0], [1, 1, 0, 1]], NUM_WORKERS)
+    engine_a = SequentialGame(board)
+    engine_b = ParallelGame(copy.deepcopy(board), 10)
 
     app = GameVisualizer(engine_a, engine_b)
     app.run()

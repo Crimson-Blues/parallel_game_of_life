@@ -1,8 +1,0 @@
-VIVAS
-1 vecino -> mueres
-2, 3 -> sobrevives
-4 o mas -> mueres
-
-MUERTA
-=! 3 -> sigues muerta xd
-== 3 -> revives
