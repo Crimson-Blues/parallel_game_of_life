@@ -12,8 +12,7 @@ Código: 750023C
 """
 from sequential import next_state
 
-
-def create_bansd)
+    
 
 def count_neighbors(grid, r, c):
     num_rows = len(grid)
@@ -48,3 +47,17 @@ def compute_band(grid, r0, r1):
         result.append(new_row)
 
     return result
+
+def create_bands(rows, num_workers):
+    bands = []
+    base = rows // num_workers
+    extra =  rows % num_workers
+    start = 0
+
+    for i in range(num_workers):
+        size = base + 1 if i<extra else base
+        end =  start + size
+        bands.append((start,end))
+        start = end
+        
+    return bands
