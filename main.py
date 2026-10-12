@@ -21,7 +21,7 @@ import copy
 if __name__ == "__main__":
     NUM_WORKERS = 10
     
-    board = Board(rows=70 , cols=70)
+    board = Board(rows=20 , cols=20)
     # Random board
     for row in range(board.rows):
         for col in range(board.cols):

@@ -170,7 +170,6 @@ class ParallelGame:
         self.board = board
         self.num_workers = num_workers
 
-
     def step(self):
         grid = self.board.grid
         chunking = create_bands(self.board.rows, self.num_workers)

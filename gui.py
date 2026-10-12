@@ -19,21 +19,38 @@ COLOR_TEXT = (220, 220, 220)      # White text
 COLOR_ACCENT = (255, 90, 95)      # Accent highlight
 
 class GameVisualizer:
-    def __init__(self, sec_engine, par_engine, cell_size=12, fps=30, divider_width=20):
+    def __init__(self, sec_engine, par_engine, cell_size=12, fps=30, window_width=1200, window_height=700):
         self.sec_engine = sec_engine
         self.par_engine = par_engine
         self.sec_board = sec_engine.board
         self.par_board = par_engine.board
         self.drawing_grid = sec_engine.board.get_grid_copy()
-        self.cell_size = cell_size
-        self.target_fps = fps
-        self.divider_width = divider_width
 
-        # Dimensiones del Canvas
+        # Dimensiones de tablero
         self.board_rows = sec_engine.board.rows
         self.board_cols = sec_engine.board.cols
-        self.width = self.sec_engine.board.cols * self.cell_size * 2 + divider_width # Extra para división
-        self.height = self.sec_engine.board.rows * self.cell_size + 40  # Extra 40px for HUD toolbar
+        
+        # Dimensiones fijas
+        self.width = window_width
+        self.height = window_height
+        self.hud_height = 40
+        self.divider_width = 20
+
+        # Available display height and width for EACH of the 2 grids
+        available_height = self.height - self.hud_height
+        available_width_per_grid = (self.width - self.divider_width) // 2
+
+        # Cálculo de tamaño de célula
+        cell_w = available_width_per_grid / self.board_cols
+        cell_h = available_height / self.board_rows
+        
+        # Mínimo de celula
+        self.cell_size = int(min(cell_w, cell_h))
+
+        # Recalcular tamaño de pantalla
+        self.width = (self.board_cols * self.cell_size * 2) + self.divider_width
+        self.height = self.board_rows * self.cell_size + self.hud_height
+
 
         # Inicializar PyGame
         pygame.init()
@@ -185,7 +202,7 @@ class GameVisualizer:
                                     pygame.draw.rect(self.screen, COLOR_ALIVE, rect)
     # Control en fase de dibujo
     def draw_drawing_hud(self):
-            hud_rect = (0, self.board_rows * self.cell_size, self.width, 40)
+            hud_rect = (0, self.height - 40, self.width, 40)
             pygame.draw.rect(self.screen, (25, 25, 35), hud_rect)
             pygame.draw.line(self.screen, (50, 50, 65), (0, hud_rect[1]), (self.width, hud_rect[1]), 1)
     
@@ -222,7 +239,7 @@ class GameVisualizer:
 
     def draw_running_hud(self):
         right_offset = self.board_cols * self.cell_size + self.divider_width
-        hud_rect = (0, self.board_rows * self.cell_size, self.width, 40)
+        hud_rect = (0, self.height - 40, self.width, 40)
         pygame.draw.rect(self.screen, (25, 25, 35), hud_rect)
         pygame.draw.line(self.screen, (50, 50, 65), (0, hud_rect[1]), (self.width, hud_rect[1]), 1)
 
@@ -262,4 +279,4 @@ class GameVisualizer:
             
 
             pygame.display.flip()
-            self.clock.tick(self.target_fps)
+            self.clock.tick(30)
