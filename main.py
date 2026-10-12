@@ -22,14 +22,14 @@ import copy
 if __name__ == "__main__":
     NUM_WORKERS = 10
     
-    board = Board(rows=50 , cols=50)
+    board = Board(rows=1000 , cols=1000)
     # Random board
     for row in range(board.rows):
         for col in range(board.cols):
             board.grid[row][col] = random.randint(0, 1) # Valor aleatorio de celda
 
     engine_a = SequentialGame(board)
-    engine_b = ParallelGame(copy.deepcopy(board), 10)
+    engine_b = ParallelPoolGame(copy.deepcopy(board), 10)
 
     app = GameVisualizer(engine_a, engine_b)
     app.run()

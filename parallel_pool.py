@@ -31,11 +31,12 @@ RULE = tuple(tuple(next_state(state, neighbors) for neighbors in range(9))
 """
 EJEMPLO DE ENTRADA
 rows =
-[
+    [0 0 0 0]   <- fantasma
     [0 0 0 0],  <- halo
     [1 1 0 0],
     [0 1 0 0],
     [1 1 1 0]   <- halo
+    [0 0 0 0]   <- fantasma
 ]
 
 EJEMPLO DE SALIDA
@@ -82,7 +83,7 @@ class ParallelPoolGame:
     def step(self):
         zero_row = [0] * self.board.cols
         rows = [zero_row] + self.board.grid + [zero_row] # Halo de ceros arriba y abajo
-        tasks = [rows[r0:r1 + 2] for r0, r1 in self.chunking]
+        tasks = [rows[r0:r1 + 2] for r0, r1 in self.chunking] # [1, 3], [3, 5]
 
         # NORMALIZAR: pool.map devuelve los bloques en orden, se aplana un nivel
         new_grid = list(chain.from_iterable(self.pool.map(step_rows, tasks)))

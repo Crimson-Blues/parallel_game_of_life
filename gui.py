@@ -8,6 +8,7 @@ Fecha de Creación: 2026-10-10
 Descripción: Interfaz Gráfica de Usuario para la visualización de iteracciones del juego
 """
 import pygame
+import numpy as np
 import sys
 import time
 
@@ -18,39 +19,41 @@ COLOR_ALIVE = (0, 255, 150)       # Neon green active cells
 COLOR_TEXT = (220, 220, 220)      # White text
 COLOR_ACCENT = (255, 90, 95)      # Accent highlight
 
+
 class GameVisualizer:
     def __init__(self, sec_engine, par_engine, cell_size=12, fps=30, window_width=1200, window_height=700):
         self.sec_engine = sec_engine
         self.par_engine = par_engine
         self.sec_board = sec_engine.board
         self.par_board = par_engine.board
-        self.drawing_grid = sec_engine.board.get_grid_copy()
+        # Copia profunda: así dibujar no modifica las filas del tablero real
+        self.drawing_grid = [row[:] for row in sec_engine.board.get_grid()]
 
         # Dimensiones de tablero
         self.board_rows = sec_engine.board.rows
         self.board_cols = sec_engine.board.cols
-        
+
         # Dimensiones fijas
         self.width = window_width
         self.height = window_height
         self.hud_height = 40
         self.divider_width = 20
 
-        # Available display height and width for EACH of the 2 grids
+        # Espacio disponible para CADA uno de los 2 tableros
         available_height = self.height - self.hud_height
         available_width_per_grid = (self.width - self.divider_width) // 2
 
-        # Cálculo de tamaño de célula
-        cell_w = available_width_per_grid / self.board_cols
-        cell_h = available_height / self.board_rows
-        
-        # Mínimo de celula
-        self.cell_size = int(min(cell_w, cell_h))
+        # Factor de escala (puede ser < 1 o fraccionario; ya no se trunca a entero)
+        self.scale = min(available_width_per_grid / self.board_cols,
+                         available_height / self.board_rows)
+
+        # Tamaño en píxeles de cada panel (mínimo 1 para evitar ventanas de 0 px)
+        self.panel_w = max(1, int(self.board_cols * self.scale))
+        self.panel_h = max(1, int(self.board_rows * self.scale))
 
         # Recalcular tamaño de pantalla
-        self.width = (self.board_cols * self.cell_size * 2) + self.divider_width
-        self.height = self.board_rows * self.cell_size + self.hud_height
-
+        self.width = self.panel_w * 2 + self.divider_width
+        self.height = self.panel_h + self.hud_height
 
         # Inicializar PyGame
         pygame.init()
@@ -66,14 +69,39 @@ class GameVisualizer:
         self.last_step_time_par = 0.0
         self.is_drawing = True
 
-        #Variables de tiempo
+        # Variables de tiempo
         self.sec_avg = 0.0
         self.par_avg = 0.0
         self.alpha = 0.05
 
+    # ------------------------------------------------------------------
+    # Utilidades de conversión
+    # ------------------------------------------------------------------
+    def grid_to_surface(self, grid):
+        """Convierte la grilla en una Surface escalada al tamaño del panel."""
+        arr = np.array(grid, dtype=np.uint8).T            # pygame usa (ancho, alto)
+        rgb = np.empty((arr.shape[0], arr.shape[1], 3), dtype=np.uint8)
+        rgb[:] = COLOR_BG
+        rgb[arr == 1] = COLOR_ALIVE
+        surf = pygame.surfarray.make_surface(rgb)
+        return pygame.transform.scale(surf, (self.panel_w, self.panel_h))
+
+    def mouse_to_cell(self, pos, offset_x):
+        """Pixel del mouse -> (fila, col), o None si cae fuera del tablero."""
+        x = pos[0] - offset_x
+        y = pos[1]
+        if 0 <= x < self.panel_w and 0 <= y < self.panel_h:
+            row = min(int(y / self.scale), self.board_rows - 1)
+            col = min(int(x / self.scale), self.board_cols - 1)
+            return row, col
+        return None
+
+    # ------------------------------------------------------------------
+    # Entrada del usuario
+    # ------------------------------------------------------------------
     def handle_input(self):
         """Processes key presses and mouse interactions."""
-        drawing_right_offset = self.width//4
+        drawing_right_offset = (self.width - self.panel_w) // 2   # tablero centrado
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -81,43 +109,36 @@ class GameVisualizer:
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    if self.is_drawing: # Primer inicio de simulación
-                        self.sec_board.set_grid(self.drawing_grid)
-                        self.par_board.set_grid(self.drawing_grid)
+                    if self.is_drawing:  # Primer inicio de simulación
+                        # Copias independientes para cada motor
+                        self.sec_board.set_grid([row[:] for row in self.drawing_grid])
+                        self.par_board.set_grid([row[:] for row in self.drawing_grid])
                         self.is_drawing = False
                         self.is_running = True
                     else:
                         self.is_running = not self.is_running  # Play/Pause
-                elif event.key == pygame.K_r and not self.is_drawing: # Reset
-                    self.drawing_state()              
+                elif event.key == pygame.K_r and not self.is_drawing:  # Reset
+                    self.drawing_state()
                 if not self.is_running and self.is_drawing:
                     if event.key == pygame.K_c:
                         self.clear_board()                    # Limpiar grilla
                     elif event.key == pygame.K_d:
                         self.randomize_board()                # Grilla aleatoria
                 elif event.key == pygame.K_RIGHT and not self.is_running:
-                    self.step_simulation()                # Avance de único paso
+                    self.step_simulation()                    # Avance de único paso
                     self.draw_grids()
 
-        # Click izquierdo para dibujar celdas
+        # Click izquierdo dibuja, click derecho borra
         mouse_pressed = pygame.mouse.get_pressed()
-        if mouse_pressed[0] and self.is_drawing:  # Left Click
-            pos = pygame.mouse.get_pos()
-            # Only draw inside the grid area (above HUD)
-            if pos[1] < self.board_rows * self.cell_size:
-                col = (pos[0] - drawing_right_offset)// self.cell_size
-                row = pos[1] // self.cell_size
-                if 0 <= row < self.board_rows and 0 <= col < self.board_cols:
-                    self.drawing_grid[row][col] = 1
+        if self.is_drawing and (mouse_pressed[0] or mouse_pressed[2]):
+            cell = self.mouse_to_cell(pygame.mouse.get_pos(), drawing_right_offset)
+            if cell:
+                row, col = cell
+                self.drawing_grid[row][col] = 1 if mouse_pressed[0] else 0
 
-        elif mouse_pressed[2] and self.is_drawing:  # Click derecho para borrarlas
-            pos = pygame.mouse.get_pos()
-            if pos[1] < self.board_rows * self.cell_size:
-                col = (pos[0]- drawing_right_offset) // self.cell_size
-                row = pos[1] // self.cell_size
-                if 0 <= row < self.board_rows and 0 <= col < self.board_cols:
-                    self.drawing_grid[row][col] = 0
-
+    # ------------------------------------------------------------------
+    # Simulación
+    # ------------------------------------------------------------------
     # Una generación del tablero
     def step_simulation(self):
         start_sec = time.perf_counter()
@@ -143,9 +164,9 @@ class GameVisualizer:
             self.par_avg = (self.alpha * par_time) + ((1 - self.alpha) * self.par_avg)
 
     def drawing_state(self):
-         self.is_drawing = True
-         self.is_running = False
-         self.drawing_grid = self.sec_board.get_grid_copy()
+        self.is_drawing = True
+        self.is_running = False
+        self.drawing_grid = [row[:] for row in self.sec_board.get_grid()]
 
     def clear_board(self):
         self.drawing_grid = [[0 for _ in range(self.board_cols)] for _ in range(self.board_rows)]
@@ -158,96 +179,61 @@ class GameVisualizer:
             for _ in range(self.board_rows)
         ]
 
-    # Dibujar grillo inicial de dibujo
+    # ------------------------------------------------------------------
+    # Dibujo
+    # ------------------------------------------------------------------
+    # Dibujar grilla inicial de dibujo
     def draw_drawing_grid(self):
-            self.screen.fill(COLOR_BG)
-            right_offset = self.width//4
-
-            # Dibujar celdas activas
-            for r in range(self.board_rows):
-                for c in range(self.board_cols):
-                    if self.drawing_grid[r][c] == 1:
-                        rect = (
-                            c * self.cell_size + right_offset,
-                            r * self.cell_size,
-                            self.cell_size - 1,  # 1px border spacing
-                            self.cell_size - 1
-                        )
-                        pygame.draw.rect(self.screen, COLOR_ALIVE, rect)
+        self.screen.fill(COLOR_BG)
+        offset = (self.width - self.panel_w) // 2          # centrado
+        self.screen.blit(self.grid_to_surface(self.drawing_grid), (offset, 0))
 
     def draw_grids(self):
-        """Renders grid cells and lines."""
+        """Renderiza los dos tableros (secuencial a la izquierda, paralelo a la derecha)."""
         self.screen.fill(COLOR_BG)
-        right_offset_x = self.cell_size * self.board_cols + self.divider_width
+        self.screen.blit(self.grid_to_surface(self.sec_board.grid), (0, 0))
+        self.screen.blit(self.grid_to_surface(self.par_board.grid),
+                         (self.panel_w + self.divider_width, 0))
 
-        # 1. Draw Active Cells
-        for r in range(self.board_rows):
-            for c in range(self.board_cols):
-                if self.sec_board.grid[r][c] == 1:
-                    rect = (
-                        c * self.cell_size,
-                        r * self.cell_size,
-                        self.cell_size - 1,  # 1px border spacing
-                        self.cell_size - 1
-                    )
-                    pygame.draw.rect(self.screen, COLOR_ALIVE, rect)
-
-                if self.par_board.grid[r][c] == 1:
-                                    rect = (
-                                        c * self.cell_size + right_offset_x,
-                                        r * self.cell_size,
-                                        self.cell_size - 1,  # 1px border spacing
-                                        self.cell_size - 1
-                                    )
-                                    pygame.draw.rect(self.screen, COLOR_ALIVE, rect)
     # Control en fase de dibujo
     def draw_drawing_hud(self):
-            hud_rect = (0, self.height - 40, self.width, 40)
-            pygame.draw.rect(self.screen, (25, 25, 35), hud_rect)
-            pygame.draw.line(self.screen, (50, 50, 65), (0, hud_rect[1]), (self.width, hud_rect[1]), 1)
-    
-            # Status & Benchmarks
-            status_str = "RUNNING" if self.is_running else "PAUSED"
-            status_color = COLOR_ALIVE if self.is_running else COLOR_ACCENT
-            
-    
-            fps_curr = int(self.clock.get_fps())
-            
-            controls_text = "[SPACE] Empezar | [L-Click] Vivas | [R-Click] Muertas | [C] Limpia | [D] Random"
-    
-            txt_surface2 = self.font.render(controls_text, True, COLOR_TEXT)
+        hud_rect = (0, self.height - 40, self.width, 40)
+        pygame.draw.rect(self.screen, (25, 25, 35), hud_rect)
+        pygame.draw.line(self.screen, (50, 50, 65), (0, hud_rect[1]), (self.width, hud_rect[1]), 1)
 
-            txt_rect = txt_surface2.get_rect()
-            txt_rect.centerx = self.width // 2           # Alinear en X
-            txt_rect.top = hud_rect[1] + 10            # Posición relativa en Y
-    
-            self.screen.blit(txt_surface2, txt_rect)
+        controls_text = "[SPACE] Empezar | [L-Click] Vivas | [R-Click] Muertas | [C] Limpia | [D] Random"
 
-    # Dibuja separador entre recuadros de versión secuencial y paralela. 
+        txt_surface2 = self.font.render(controls_text, True, COLOR_TEXT)
+
+        txt_rect = txt_surface2.get_rect()
+        txt_rect.centerx = self.width // 2           # Alinear en X
+        txt_rect.top = hud_rect[1] + 10              # Posición relativa en Y
+
+        self.screen.blit(txt_surface2, txt_rect)
+
+    # Dibuja separador entre recuadros de versión secuencial y paralela.
     def draw_separator(self):
         # Coordenada x de divisor
-        divider_x = self.board_cols * self.cell_size + (self.divider_width // 2)
-        
+        divider_x = self.panel_w + (self.divider_width // 2)
+
         line_color = (60, 65, 80)  # Linea divisoria
         pygame.draw.line(
             self.screen,
             line_color,
-            (divider_x, 0), # Desde inicio                      
-            (divider_x, self.height), # Hasta top de pantalla
-            width=2                                
+            (divider_x, 0),            # Desde inicio
+            (divider_x, self.height),  # Hasta top de pantalla
+            width=2
         )
 
     def draw_running_hud(self):
-        right_offset = self.board_cols * self.cell_size + self.divider_width
+        right_offset = self.panel_w + self.divider_width
         hud_rect = (0, self.height - 40, self.width, 40)
         pygame.draw.rect(self.screen, (25, 25, 35), hud_rect)
         pygame.draw.line(self.screen, (50, 50, 65), (0, hud_rect[1]), (self.width, hud_rect[1]), 1)
 
         # Status & Benchmarks
-        status_str = "RUNNING" if self.is_running else "PAUSED"
         status_color = COLOR_ALIVE if self.is_running else COLOR_ACCENT
-        
-        
+
         info_text_sec = f"[Secuencial] | Paso: {self.last_step_time_sec:.2f}ms | Promedio : {self.sec_avg:.2f}ms"
         info_text_par = f"[Paralelo] | Paso: {self.last_step_time_par:.2f}ms | Promedio : {self.par_avg:.2f}ms"
         controls_text = "[SPACE] Play/Pause | [R] Reiniciar"
@@ -272,11 +258,9 @@ class GameVisualizer:
             elif self.is_drawing:
                 self.draw_drawing_grid()
                 self.draw_drawing_hud()
-            
+
             if not self.is_drawing:
                 self.draw_running_hud()
-            
-            
 
             pygame.display.flip()
             self.clock.tick(30)

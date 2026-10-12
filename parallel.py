@@ -17,7 +17,6 @@ from multiprocessing import Process, Manager
 from itertools import chain
 import atexit
 
-
 # LECTOR DE CELULA
 # ENTRADAS: Tablero con borde de ceros, fila de la celula y columna de la celula
 # SALIDAS: Número de células vivas que rodean a la célula
@@ -49,10 +48,10 @@ EJEMPLO DE SALIDA
     [4 5 4 2],
     [3 4 4 1]
 ]"""
-def count_grid(grid, chunking, tasks, results):
+def count_grid(grid, chunking, queues_list, results):
     zero_row = [0] * len(grid[0])
     rows = [zero_row] + grid + [zero_row] # Halo de ceros arriba y abajo
-    return run_phase(tasks, results, [(rows[r0:r1 + 2],) for r0, r1 in chunking])
+    return run_phase(queues_list, results, [(rows[r0:r1 + 2],) for r0, r1 in chunking])
 
 
 # LEER POR BLOQUE
@@ -126,14 +125,14 @@ def run_task(function, args, results, index):
 # PROCESO PERSISTENTE
 # ENTRADAS: Colas de la fase de conteo, colas de la fase de siguiente estado e index de la banda
 # Vive toda la ejecución: en cada generación cuenta su banda y luego calcula su siguiente estado
-def worker(count_tasks, count_results, state_tasks, state_results, index):
+def worker(count_queue, count_results, state_queue, state_results, index):
     while True:
-        task = count_tasks.get()
+        task = count_queue.get()
         if task is None:
             break # Señal de apagado
         run_task(count_rows, task, count_results, index)
 
-        task = state_tasks.get()
+        task = state_queue.get()
         if task is None:
             break # Apagado mientras esperaba la segunda fase (p. ej. tras un fallo)
         run_task(rows_next_state, task, state_results, index)
@@ -162,7 +161,7 @@ class ParallelGame:
         self.chunking = create_bands(board.rows, num_workers) # Las dimensiones del tablero no cambian
 
         # Manager 1: fase de conteo | Manager 2: fase de siguiente estado
-        self.count_manager = Manager()
+        self.count_manager = Manager() # MECANISMO DE IPC (Inter Procecess Comunication)
         self.state_manager = Manager()
         self.count_tasks = [self.count_manager.Queue() for _ in range(num_workers)]
         self.count_results = self.count_manager.Queue()
