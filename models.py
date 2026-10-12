@@ -47,7 +47,7 @@ class Board:
 
     def set_cell(self, r, c, cell):
         try:
-            self.board[r][c] = cell
+            self.grid[r][c] = cell
         except IndexError:
             raise Exception("Selected cell out of bounds of current board.")
 
@@ -58,7 +58,7 @@ class Board:
         return self.grid.copy()
 
     def count_neighbors(self, r, c):
-        if 0 <= r <= self.rows and 0 <= c <= self.cols:
+        if 0 <= r < self.rows and 0 <= c < self.cols:
             count = 0
             for dr in (-1, 0, 1): # Vecinos de fila
                 for dc in (-1, 0, 1): # Vecinos de columna
