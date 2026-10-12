@@ -12,6 +12,7 @@ Código: 750023C
 """
 from sequential import next_state
 from multiprocessing import Process, Manager
+from itertools import chain
 
 
 # LECTOR DE CELULA    
@@ -38,7 +39,6 @@ def count_neighbors(grid, r, c):
     return count
 
 
-
 # LECTOR DE TABLERO PARALELO
 # ENTRADAS = 
 """ 
@@ -52,20 +52,27 @@ chunking = [[0 2] [2 4]]
 ]
 EJEMPLO DE SALIDA
 [
-    [[2 2 2 0], [5 5 4 1]],
-    [[4 5 4 2], [3 4 4 1]]
+    [2 2 2 0], 
+    [5 5 4 1],
+    [4 5 4 2], 
+    [3 4 4 1]
 ]"""
-def readed_grid(grid, chunking):
+def count_grid(grid, chunking):
     with Manager() as manager:
-        results = manager.list([None] * len(chunking))
-        processes = [Process(target=readed_chunks, args=(grid, band, results, i))
+        processes_results = manager.list([None] * len(chunking))
+        processes = [Process(target=count_rows, args=(grid, band, processes_results, i))
                      for i, band in enumerate(chunking)]
 
         for process in processes:
             process.start()
         for process in processes:
             process.join()
-        return list(results) 
+            if process.exitcode != 0:
+                raise RuntimeError(f"Un proceso falló (exitcode={process.exitcode})")
+
+        # NORMALIZAR: aplana un nivel
+        results = list(chain.from_iterable(processes_results[:]))
+        return results
 
 
 # LEER POR BLOQUE
@@ -89,7 +96,7 @@ results[index]=
     [5 5 4 1]
 ]
 """
-def readed_chunks(grid, target_rows, results, index):
+def count_rows(grid, target_rows, results, index):
     r0, r1 = target_rows
     readed_block = []
     
@@ -104,49 +111,35 @@ def readed_chunks(grid, target_rows, results, index):
 #LECTOR DE LOS BLOQUES RESULTANTES DE readed_chunks
 #ENTRADAS: recibe el tablero para saber cuales son las celular vivas, e lchunking y el resultado de haber leido los chunks
 #SALIDA: los bloques con las nuevas celulas 
-def read_blocks(grid, chunking, readed_bock):
+def grid_next_state(grid, chunking, readed_block):
     with Manager() as manager:
-        results = manager.list([None] * len(readed_bock))
-        processes = [Process(target=write_blocks, args=(grid[r0:r1], readed_bock[i], results, i))
+        processes_results = manager.list([None] * len(chunking))
+        processes = [Process(target=rows_next_state, args=(grid[r0:r1], readed_block[r0:r1], processes_results, i))
                     for i, (r0, r1) in enumerate(chunking)]
         
         for process in processes:
             process.start()
         for process in processes:
             process.join()
-        return list(results)
+            if process.exitcode != 0:
+                raise RuntimeError(f"Un proceso falló (exitcode={process.exitcode})")
+
+        # NORMALIZAR: aplana un nivel
+        results = list(chain.from_iterable(processes_results[:]))
+        
+        return results
 
 
-def write_blocks(grid, block, results, index):
+def rows_next_state(grid, block, results, index):
     cells = []
 
     for r in range(len(block)):
         new_row =[]
         for c in range(len(block[0])):
-            if grid[r][c] == 1:
-                if block[r][c] < 2:
-                    new_cell = 0 # Muerte por soledad
-                elif 2 <= block[r][c] <= 3:
-                    new_cell = 1 # Mantiene viva
-                else:
-                    new_cell = 0 # Muerte por sobrepoblación
-
-            else: # Para célula muerta
-                if block[r][c] == 3:
-                    new_cell = 1 # Revive si tiene 3 vecinos
-                else:
-                    new_cell = 0 # Mantiene muerta
-
+            new_cell = next_state(grid[r][c], block[r][c])
             new_row.append(new_cell)
         cells.append(new_row)
     results[index] = cells
-
-def normalizer(blocks):
-    board_rows = []
-    for block in blocks:
-        board_rows += block
-
-    return board_rows   
 
 
 # HACER EL CHUNKING
@@ -173,8 +166,6 @@ class ParallelGame:
     def step(self):
         grid = self.board.grid
         chunking = create_bands(self.board.rows, self.num_workers)
-        counts = readed_grid(grid, chunking)
-        new_blocks = read_blocks(grid, chunking, counts)
-        new_grid = normalizer(new_blocks)
+        counts = count_grid(grid, chunking)
+        new_grid = grid_next_state(grid, chunking, counts)
         self.board.set_grid(new_grid)
-
