@@ -16,6 +16,7 @@ from sequential import SequentialGame
 #from parallel import ParallelGame
 from gui import GameVisualizer
 import random
+import copy
 
 if __name__ == "__main__":
     MODE = "sequential"  # Opciones: "sequential" or "parallel"
@@ -27,7 +28,8 @@ if __name__ == "__main__":
             board.grid[row][col] = random.randint(0, 1) # Valor aleatorio de celda
 
     if MODE == "sequential":
-        engine = SequentialGame(board)
+        engine_a = SequentialGame(board)
+        engine_b = SequentialGame(copy.deepcopy(board))
 
-    app = GameVisualizer(engine)
+    app = GameVisualizer(engine_a, engine_b)
     app.run()
