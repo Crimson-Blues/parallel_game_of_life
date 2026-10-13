@@ -279,10 +279,12 @@ class GameVisualizer:
         txt_surface1 = self.font.render(info_text_sec, True, status_color)
         txt_surface2 = self.font.render(info_text_par, True, status_color)
         txt_surface3 = self.font.render(controls_text, True, COLOR_TEXT)
+        txt_surface4 = self.font.render(f"Generación: {self.step_num}", True, COLOR_TEXT)
 
         self.screen.blit(txt_surface1, (10, hud_rect[1] + 4))
         self.screen.blit(txt_surface2, (10 + right_offset, hud_rect[1] + 4))
         self.screen.blit(txt_surface3, (10, hud_rect[1] + 20))
+        self.screen.blit(txt_surface4, (10 + right_offset, hud_rect[1] + 20))
         self.draw_separator()
 
     # Ciclo principal de aplicación de PyGame
