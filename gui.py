@@ -23,6 +23,7 @@ COLOR_ACCENT = (255, 90, 95)      # Accent highlight
 # Comandos 
 CMD_STEP = 1
 CMD_EXIT = 0
+CMD_SPLIT = 2
 
 
 class GameVisualizer:
@@ -82,6 +83,12 @@ class GameVisualizer:
         self.par_avg = 0.0
         self.alpha = 0.05
 
+        # Registro de tiempos por paso
+        self.times_sec = []
+        self.times_par = []
+        self.step_num = 0
+        self.max_steps = 100
+
     # ------------------------------------------------------------------
     # Utilidades de conversión
     # ------------------------------------------------------------------
@@ -121,7 +128,8 @@ class GameVisualizer:
                         # Copias independientes para cada motor
                         self.sec_board.set_grid([row[:] for row in self.drawing_grid])
                         self.par_board.set_grid([row[:] for row in self.drawing_grid])
-                        self.par_engine.split_board() # Re-scatter la grid nueva
+                        self.comm.bcast(CMD_SPLIT, root=0)   # avisa a los workers
+                        self.par_engine.split_board()        # re-scatter
                         self.is_drawing = False
                         self.is_running = True
                     else:
@@ -183,10 +191,20 @@ class GameVisualizer:
         else:
             self.par_avg = (self.alpha * par_time) + ((1 - self.alpha) * self.par_avg)
 
+        # Solo se registran los primeros max_steps; la simulación sigue después
+        if self.step_num < self.max_steps:
+            self.times_sec.append(sec_time)
+            self.times_par.append(par_time)
+        self.step_num += 1
+
     def drawing_state(self):
         self.is_drawing = True
         self.is_running = False
         self.drawing_grid = [row[:] for row in self.sec_board.get_grid()]
+
+        self.times_sec.clear()
+        self.times_par.clear()
+        self.step_num = 0
 
     def clear_board(self):
         self.drawing_grid = [[0 for _ in range(self.board_cols)] for _ in range(self.board_rows)]
@@ -278,6 +296,7 @@ class GameVisualizer:
             if self.is_running:
                 self.step_simulation()
                 self.draw_grids()
+                
             elif self.is_drawing:
                 self.draw_drawing_grid()
                 self.draw_drawing_hud()

@@ -19,11 +19,12 @@ import random
 import copy
 import sys
 from mpi4py import MPI
+from results import save_results
 
 # Define comandos MPI
 CMD_STEP = 1
 CMD_EXIT = 0
-
+CMD_SPLIT = 2
 
 # Headless worker para rangos distintos de 0
 def run_worker_loop(engine_b):
@@ -38,6 +39,8 @@ def run_worker_loop(engine_b):
         # Ejecución segun comandos
         if cmd == CMD_STEP:
             engine_b.step()
+        elif cmd == CMD_SPLIT:
+            engine_b.split_board()
         elif cmd == CMD_EXIT:
             break
 
@@ -50,7 +53,7 @@ if __name__ == "__main__":
 
     # Rango 0 inicializa la configuración aletoria de tablero
     if rank == 0:
-        board = Board(rows=20, cols=20)
+        board = Board(rows=500, cols=500)
         for row in range(board.rows):
             for col in range(board.cols):
                 board.grid[row][col] = random.randint(0, 1)
@@ -68,6 +71,11 @@ if __name__ == "__main__":
 
         # Todos los rangos terminan al cerrarse la aplicación
         comm.bcast(CMD_EXIT, root=0)
+
+        save_results(app.times_sec, app.times_par,
+                           app.board_rows, app.board_cols, comm.Get_size())
+    
+        
     else:
         # Los rangos distintos de 0 entran a un ciclo de trabajo sin GUI
         run_worker_loop(engine_b)
