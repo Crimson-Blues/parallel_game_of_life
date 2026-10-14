@@ -11,6 +11,7 @@ import pygame
 import numpy as np
 import sys
 import time
+from mpi4py import MPI
 
 # Color Palette (RGB)
 COLOR_BG = (15, 15, 20)          # Dark background
@@ -19,15 +20,23 @@ COLOR_ALIVE = (0, 255, 150)       # Neon green active cells
 COLOR_TEXT = (220, 220, 220)      # White text
 COLOR_ACCENT = (255, 90, 95)      # Accent highlight
 
+# Comandos 
+CMD_STEP = 1
+CMD_EXIT = 0
+CMD_SPLIT = 2
+
 
 class GameVisualizer:
-    def __init__(self, sec_engine, par_engine, cell_size=12, fps=30, window_width=1200, window_height=700):
+    def __init__(self, sec_engine, par_engine, comm, cell_size=12, fps=30, window_width=1200, window_height=700):
         self.sec_engine = sec_engine
         self.par_engine = par_engine
         self.sec_board = sec_engine.board
         self.par_board = par_engine.board
         # Copia profunda: así dibujar no modifica las filas del tablero real
         self.drawing_grid = [row[:] for row in sec_engine.board.get_grid()]
+
+        # Comunicador entre procesos
+        self.comm = comm
 
         # Dimensiones de tablero
         self.board_rows = sec_engine.board.rows
@@ -74,6 +83,12 @@ class GameVisualizer:
         self.par_avg = 0.0
         self.alpha = 0.05
 
+        # Registro de tiempos por paso
+        self.times_sec = []
+        self.times_par = []
+        self.step_num = 0
+        self.max_steps = 100
+
     # ------------------------------------------------------------------
     # Utilidades de conversión
     # ------------------------------------------------------------------
@@ -104,8 +119,8 @@ class GameVisualizer:
         drawing_right_offset = (self.width - self.panel_w) // 2   # tablero centrado
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                self.is_running = False
+                return "QUIT"
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
@@ -113,6 +128,8 @@ class GameVisualizer:
                         # Copias independientes para cada motor
                         self.sec_board.set_grid([row[:] for row in self.drawing_grid])
                         self.par_board.set_grid([row[:] for row in self.drawing_grid])
+                        self.comm.bcast(CMD_SPLIT, root=0)   # avisa a los workers
+                        self.par_engine.split_board()        # re-scatter
                         self.is_drawing = False
                         self.is_running = True
                     else:
@@ -152,9 +169,20 @@ class GameVisualizer:
         else:
             self.sec_avg = (self.alpha * sec_time) + ((1 - self.alpha) * self.sec_avg)
 
-        start_par = time.perf_counter()
+        # Barrera para asegurar que sincronizar todos los rangos
+        #self.comm.Barrier()
+        start_par = MPI.Wtime()
+
+        # Broadcast de comando step
+        self.comm.bcast(CMD_STEP, root=0)
+
         self.par_engine.step()
-        end_par = time.perf_counter()
+
+        # Sincronizar para asegurar que todos han terminado
+        #self.comm.Barrier()
+        end_par = MPI.Wtime()
+
+        # Tiempo de cómputo
         par_time = (end_par - start_par) * 1000
         self.last_step_time_par = par_time
 
@@ -163,10 +191,20 @@ class GameVisualizer:
         else:
             self.par_avg = (self.alpha * par_time) + ((1 - self.alpha) * self.par_avg)
 
+        # Solo se registran los primeros max_steps; la simulación sigue después
+        if self.step_num < self.max_steps:
+            self.times_sec.append(sec_time)
+            self.times_par.append(par_time)
+        self.step_num += 1
+
     def drawing_state(self):
         self.is_drawing = True
         self.is_running = False
         self.drawing_grid = [row[:] for row in self.sec_board.get_grid()]
+
+        self.times_sec.clear()
+        self.times_par.clear()
+        self.step_num = 0
 
     def clear_board(self):
         self.drawing_grid = [[0 for _ in range(self.board_cols)] for _ in range(self.board_rows)]
@@ -241,20 +279,26 @@ class GameVisualizer:
         txt_surface1 = self.font.render(info_text_sec, True, status_color)
         txt_surface2 = self.font.render(info_text_par, True, status_color)
         txt_surface3 = self.font.render(controls_text, True, COLOR_TEXT)
+        txt_surface4 = self.font.render(f"Generación: {self.step_num}", True, COLOR_TEXT)
 
         self.screen.blit(txt_surface1, (10, hud_rect[1] + 4))
         self.screen.blit(txt_surface2, (10 + right_offset, hud_rect[1] + 4))
         self.screen.blit(txt_surface3, (10, hud_rect[1] + 20))
+        self.screen.blit(txt_surface4, (10 + right_offset, hud_rect[1] + 20))
         self.draw_separator()
 
+    # Ciclo principal de aplicación de PyGame
     def run(self):
-        """Main Pygame application loop."""
-        while True:
-            self.handle_input()
+        running =  True
+        while running:
+            if self.handle_input() == "QUIT":
+                running = False
+                break
 
             if self.is_running:
                 self.step_simulation()
                 self.draw_grids()
+                
             elif self.is_drawing:
                 self.draw_drawing_grid()
                 self.draw_drawing_hud()
@@ -264,3 +308,5 @@ class GameVisualizer:
 
             pygame.display.flip()
             self.clock.tick(30)
+
+        pygame.quit()
