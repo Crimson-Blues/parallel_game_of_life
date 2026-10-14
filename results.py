@@ -1,3 +1,14 @@
+"""
+Nombre: results
+Autores:
+- Juan Diego Cárdenas Mejía - 2416437
+- Samuel Banguero Ortega - 2418671
+- Santiago Arias Rojas - 2416285
+Fecha de Creación: 2026-10-10
+Descripción: Genera y guarda los resultados de rendimiento de las
+implementaciones secuencial y paralela 
+"""
+
 import os
 from datetime import datetime
 
