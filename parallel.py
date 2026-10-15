@@ -6,8 +6,6 @@ Autores:
 - Santiago Arias Rojas - 2416285
 Fecha de Creación: 2026-10-10
 Descripción: Cálculo paralelo de la siguiente generación del juego.
-Los 2 managers (uno por fase) y los procesos se crean una sola vez y se
-reutilizan en todas las generaciones.
 
 Curso: Infraestructuras Paralelas y Distribuidas
 Código: 750023C
