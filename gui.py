@@ -25,7 +25,12 @@ CMD_STEP = 1
 CMD_EXIT = 0
 CMD_SPLIT = 2
 
-
+"""
+Clase que implementa lógica de interfaz gráfica del juego:
+* Controla los inputs de usuario.
+* Realiza llamado a steps() de motores de juego
+* Dibuja HUD y resultados en pantalla
+"""
 class GameVisualizer:
     def __init__(self, sec_engine, par_engine, comm, cell_size=12, fps=30, window_width=1200, window_height=700):
         self.sec_engine = sec_engine

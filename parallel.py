@@ -5,7 +5,7 @@ Autores:
 - Samuel Banguero Ortega - 2418671
 - Santiago Arias Rojas - 2416285
 Fecha de Creación: 2026-10-10
-Descripción: Cálculo paralelo de la siguiente generación del juego.
+Descripción: Motor de cálculo paralelo de la siguiente generación del juego.
 
 Curso: Infraestructuras Paralelas y Distribuidas
 Código: 750023C
