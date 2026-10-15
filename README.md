@@ -17,7 +17,7 @@ Taller de Infraestructuras Paralelas y Distribuidas (750023C). Compara una versi
 
 ```bash
 git clone https://github.com/Crimson-Blues/parallel_game_of_life.git
-cd parallel
+cd parallel_game_of_life
 ```
 
 ## 2. Instalar MPI y dependencias
